@@ -365,7 +365,7 @@ class DosingApp(tk.Tk):
         top.title(f"Set Volumes for {well_id}")
         top.transient(self)
         top.grab_set()
-        top.resizable(False, False)
+        top.resizable(True, True)
 
         frm = ttk.Frame(top, padding=12)
         frm.pack(fill="both", expand=True)
@@ -449,7 +449,7 @@ class DosingApp(tk.Tk):
         ttk.Button(btnfrm, text="Save", command=on_save).pack(side="right", padx=(4, 0))
 
         # Center the popup
-        self.center_window(top, width=320, height=60 + 32 * len(self.sources))
+        self.center_window(top, width=320, height=100 + 32 * len(self.sources))
 
     def update_well_visual(self, well_id: str):
         # Visual cue: if total is zero -> white; if > 0 -> light tint; if exceeds max -> red outline
