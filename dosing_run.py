@@ -9,7 +9,7 @@ import json
 import time
 
 # Import the hardware layer
-from hardware_interfaces import Pump, EnderMovement
+from hardwareInterfaces import Pump, EnderMovement
 
 
 @dataclass
