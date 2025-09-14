@@ -13,7 +13,9 @@ import time
 from datetime import datetime
 import numpy as np
 
+import pumpControl
 
+# --------------- Toolhead control --------------
 
 def command(ser, cmd):
     """Send G-code command and wait for 'ok' response."""
@@ -57,21 +59,33 @@ def dosePositioning(ser, z=0, speed=9000):
 
     return None
 
-# --------------------------------------------------------------------
-# ser = serial.Serial("COM5", 115200, timeout=2)
-# time.sleep(2)
-#
-# command(ser, "G28")   # home all axes
-# command(ser, "G21")   # mm mode
-# command(ser, "G90")   # absolute positioning
-# command(ser, "M203 Z1200") # adjust z direction max speed
+# ----------------Pump Control-----------------------------
+
+def initializePump(COMPort, syringeVol, syringeDiam):
+    pumpChain = pumpControl.Chain(f'{COMPort}')
+    pump = pumpControl.Pump(pumpChain)
+    pump.cvolume()
+    pump.setdiameter(syringeDiam) # diameter in mm
+    pump.setsyringevolume(syringeVol, "m") # see pumpy documentation for unit labels. m = mL
+
+    return pump
+
+def withdraw(pump, withdrawVol, flowRate=1, volUnits='m', flowRateUnits="m/s"):
+    # see pumpControl.py or pumpy documentation for flowrate units. Units of [volume]/[time] are listed in pumpy as [m,u,p]/[h,m,s] and correspond to [mL, uL, pL]/[hour, min, sec]
+    pump.setwithdrawrate(flowRate, flowRateUnits)  # m/m = ml/sec
+
+    # pump.infuseDuration(steadyStateDevelopment)
+    calibratedWithdrawVol = withdrawVol + .0344 #(.85*withdrawVol-25.413)/1000
+    pump.withdrawDuration(calibratedWithdrawVol/flowRate)
 
 
+def infuse(pump, infuseVol, flowRate=1, volUnits='m', flowRateUnits="m/s"):
+    # see pumpControl.py or pumpy documentation for flowrate units. Units of [volume]/[time] are listed in pumpy as [m,u,p]/[h,m,s] and correspond to [mL, uL, pL]/[hour, min, sec]
+    pump.setinfusionrate(flowRate, flowRateUnits)  # m/m = ml/sec
 
-yVals = np.linspace(81.5, 81.5 + 9 * 7, 8)  # 8 steps in X
-xVals = np.linspace(63.5, 63.5 + 9 * 11, 12)  # 12 steps in Y
-solutionA = [37.66, 196]
-
+    # pump.infuseDuration(steadyStateDevelopment)
+    calibratedInfuseVol = infuseVol + .0344 #(.85 * infuseVol - 25.413) / 1000
+    pump.infuseDuration(calibratedInfuseVol/flowRate)
 
 # example script using the above to dose 1 fluid
 # try:

@@ -48,7 +48,7 @@ PLATE_OFFSETS: Dict[str, Dict[str, float]] = {
 # Provide the XY for every fluid label you’ll actually dose.
 FLUID_RESERVOIRS: Dict[str, Tuple[float, float]] = {
     "A": (37.66, 196.00),
-    # "B": (xB, yB),
+    "B": (37.66*2, 196.00),
     # "C": (xC, yC),
     # "D": (xD, yD),
     # "E": (xE, yE),
@@ -161,7 +161,7 @@ def resolve_plate_coords(plate_meta: Dict[str, Any]) -> Tuple[float, float, floa
 
 # -------------------- Orchestration --------------------
 
-def run_dosing(ser, plan: List[Dict[str, Any]], plate_meta: Dict[str, Any], overdraw_uL: float = 0.0):
+def run_dosing(ser, pump, plan: List[Dict[str, Any]], plate_meta: Dict[str, Any], overdraw_uL: float = 0.0):
     """
     Execute per-fluid dosing sequence using hardwareInterfaces for motion.
 
@@ -201,15 +201,15 @@ def run_dosing(ser, plan: List[Dict[str, Any]], plate_meta: Dict[str, Any], over
             pickup = v + max(0.0, overdraw_uL)
 
             # 1) Go to fluid reservoir and withdraw (aspirate) pickup volume
-            hw.moveTo(ser, res_xy[0], res_xy[1], TRAVEL_Z, zlift=TRAVEL_Z, speed=F_XY)
-            hw.dosePositioning(ser, z=ASPIRATE_Z, speed=F_Z)
-            if hasattr(hw, "withdraw"):
-                hw.withdraw(pickup)
-            elif hasattr(hw, "aspirate"):
-                hw.aspirate(pickup)
-            else:
-                print(f"[info] No pump API in hardwareInterfaces. Skipping aspiration of {pickup:.2f} uL.")
-            hw.dosePositioning(ser, z=TRAVEL_Z, speed=F_Z)
+            # hw.moveTo(ser, res_xy[0], res_xy[1], TRAVEL_Z, zlift=TRAVEL_Z, speed=F_XY)
+            # hw.dosePositioning(ser, z=ASPIRATE_Z, speed=F_Z)
+            # if hasattr(hw, "withdraw"):
+            #     hw.withdraw(pump=pump,withdrawVol=v/1000)
+            # elif hasattr(hw, "aspirate"):
+            #     hw.aspirate(v)
+            # else:
+            #     print(f"[info] No pump API in hardwareInterfaces. Skipping aspiration of {pickup:.2f} uL.")
+            # hw.dosePositioning(ser, z=TRAVEL_Z, speed=F_Z)
 
             # 2) Go to target well and dispense (infuse) actual volume
             print(f"[{lab}] {wid} -> ({wx:.2f}, {wy:.2f}): {v:.2f} uL")
@@ -218,9 +218,9 @@ def run_dosing(ser, plan: List[Dict[str, Any]], plate_meta: Dict[str, Any], over
 
             # If you actually need to aspirate at the well and dispense at the reservoir, swap the two blocks:
             if hasattr(hw, "infuse"):
-                hw.infuse(v)
+                hw.infuse(pump=pump, infuseVol=pickup/1000)
             elif hasattr(hw, "dispense"):
-                hw.dispense(v)
+                hw.dispense(pickup)
             else:
                 print(f"[info] No pump API in hardwareInterfaces. Skipping dispense of {v:.2f} uL.")
 
@@ -236,6 +236,7 @@ def main():
     ap.add_argument("--port", default="COM5", help="Serial port for motion controller (e.g., COM5, /dev/ttyUSB0)")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--plan", default=None, help="Optional: path to a JSON plan (skip GUI).")
+    ap.add_argument("--pumpPort", default="COM8", help="Serial port for pump control (e.g., COM7")
     args = ap.parse_args()
 
     # Load plan either from GUI (default) or JSON file
@@ -248,11 +249,13 @@ def main():
     else:
         plan, plate_meta = capture_plan_from_gui()
 
-    # Open serial and run
+    # Open pump and printer serial and run
     ser = serial.Serial(args.port, args.baud, timeout=2)
+    pump = hw.initializePump(args.pumpPort, syringeVol=60, syringeDiam=29.4)
+
     time.sleep(2)
     try:
-        run_dosing(ser, plan, plate_meta)
+        run_dosing(ser, pump, plan, plate_meta)
     finally:
         try:
             ser.close()
